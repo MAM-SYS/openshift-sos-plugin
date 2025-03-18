@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # vars
-RED='\e[31m'
-GREEN='\e[32m'
-RESET='\e[0m'
+RED=$(tput setaf 1 2>/dev/null || echo "")
+GREEN=$(tput setaf 2 2>/dev/null || echo "")
+RESET=$(tput sgr0 2>/dev/null || echo "")
+KUBECTL_PLUGINS_CURRENT_NAMESPACE=$(oc config view --minify -o 'jsonpath={..namespace}')
 OC_CMD="oc -n $KUBECTL_PLUGINS_CURRENT_NAMESPACE"
 
 # precheck
@@ -14,12 +15,20 @@ if [ $? -ne 0 ]; then
 fi
 
 # initialize
-TMP_DIR=$(mktemp -d --suffix=-openshift-sos-plugin)
+TMP_DIR=$(mktemp -d -t openshift-sos-plugin)
 DEST=$TMP_DIR/$KUBECTL_PLUGINS_CURRENT_NAMESPACE
 mkdir -p $DEST
 
 # Enable command logging
-exec {BASH_XTRACEFD}>>$DEST/sos.log
+if [[ $BASH_VERSINFO -ge 4 ]] && [[ $BASH_VERSINFO[1] -ge 1 ]]; then
+    # For Bash 4.1+ (Linux and newer Bash on macOS)
+    exec {BASH_XTRACEFD}>>"$DEST/sos.log"
+else
+    # For older Bash versions (default macOS Bash)
+    exec 2>"$DEST/sos.log"  # Redirect stderr to log file
+    # Optional: Save original stderr and tee trace output
+    # exec 3>&2 2> >(tee -a "$DEST/sos.log" >&3)
+fi
 set -x
 
 # data capture
